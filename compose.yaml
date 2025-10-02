@@ -1,6 +1,6 @@
 services:
   postgresDB:
-    image: postgres:latest
+    image: postgres:18.0-bookworm
     ports:
       - 5432:5432
     volumes:
@@ -11,9 +11,10 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_DB=${POSTGRES_DB}
   GoLanguage:
-    image: golang:latest
+    image: golang:1.25.1-bookworm
     ports:
       - 8080:8080
     volumes:
       - .:/app
     restart: unless-stopped
+    command: ["sleep", "infinity"]

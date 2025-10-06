@@ -1,0 +1,30 @@
+package sqlstore
+
+import (
+	"database/sql"
+
+	storage "github.com/Kirieshkii/cms-project/internal/store"
+)
+
+type Store struct {
+	db             *sql.DB
+	userRepository storage.UserRepository
+}
+
+func New(db *sql.DB) *Store {
+	return &Store{
+		db: db,
+	}
+}
+
+func (s *Store) DB() *sql.DB {
+	return s.db
+}
+
+// User returns the user repository instance, initializing it on first access.
+func (s *Store) User() storage.UserRepository {
+	if s.userRepository == nil {
+		s.userRepository = NewUserRepository(s)
+	}
+	return s.userRepository
+}

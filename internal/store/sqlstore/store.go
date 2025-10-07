@@ -17,6 +17,7 @@ func New(db *sql.DB) *Store {
 	}
 }
 
+// метод DB инкапсулирует запрос к локальному полю db *sql.DB
 func (s *Store) DB() *sql.DB {
 	return s.db
 }

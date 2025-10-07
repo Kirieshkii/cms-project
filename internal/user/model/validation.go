@@ -1,13 +1,12 @@
 package model
 
-import validation "github.com/go-ozzo/ozzo-validation"
+import (
+	"strings"
 
-func requiredIf(cond bool) validation.RuleFunc {
-	return func(value any) error {
-		if cond {
-			return validation.Validate(value, validation.Required)
-		}
+	validation "github.com/go-ozzo/ozzo-validation"
+)
 
-		return nil
-	}
+func ValidatePassword(password string) error {
+	password = strings.TrimSpace(password)
+	return validation.Validate(password, validation.Required, validation.Length(6, 100))
 }

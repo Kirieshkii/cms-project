@@ -10,15 +10,18 @@ import (
 func CreateAdmin(s storage.Store, email string, password string) error {
 
 	u := &model.User{
-		Email:    email,
-		Password: password,
+		Email: email,
 	}
 
-	if err := u.Validate(); err != nil {
-		return fmt.Errorf("ошибка валидации email и/или password: %w", err)
+	if err := u.ValidateEmail(); err != nil {
+		return fmt.Errorf("ошибка валидации email: %w", err)
 	}
 
-	if err := u.BeforeCreate(); err != nil {
+	if err := model.ValidatePassword(password); err != nil {
+		return fmt.Errorf("ошибка валидации password: %w", err)
+	}
+
+	if err := u.BeforeCreate(password); err != nil {
 		return fmt.Errorf("ошибка хеширования пароля: %w", err)
 	}
 

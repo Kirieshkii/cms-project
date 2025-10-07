@@ -14,6 +14,7 @@ func NewUserRepository(s *Store) *UserRepository {
 	return &UserRepository{store: s}
 }
 
+// метод db является сокращением, позволяя вместо r.store.db писать r.db()
 func (r *UserRepository) db() *sql.DB {
 	return r.store.DB()
 }

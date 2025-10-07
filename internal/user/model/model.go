@@ -12,22 +12,18 @@ import (
 type User struct {
 	ID                int    `json:"id"`
 	Email             string `json:"email"`
-	Password          string `json:"password,omitempty"`
 	EncryptedPassword string `json:"-"`
 }
 
 // Validate валидирует полученного пользователя по email и длине password
-func (u *User) Validate() error {
-	return validation.ValidateStruct(u,
-		validation.Field(&u.Email, validation.Required, is.Email),
-		validation.Field(&u.Password, validation.By(requiredIf(u.EncryptedPassword == "")), validation.Length(6, 100)),
-	)
+func (u *User) ValidateEmail() error {
+	return validation.ValidateStruct(u, validation.Field(&u.Email, validation.Required, is.Email))
 }
 
 // BeforeCreate шифрует пароль, полученный в структуре User, в случае неудачи возвращает ошибку
-func (u *User) BeforeCreate() error {
-	if len(u.Password) > 0 {
-		enc, err := encryptString(u.Password)
+func (u *User) BeforeCreate(password string) error {
+	if len(password) > 0 {
+		enc, err := encryptString(password)
 		if err != nil {
 			return err
 		}
@@ -36,11 +32,6 @@ func (u *User) BeforeCreate() error {
 	}
 
 	return nil
-}
-
-// Sanitize стирает приватные данные
-func (u *User) Sanitize() {
-	u.Password = ""
 }
 
 // ComparePassword сравнивает хэш пароли

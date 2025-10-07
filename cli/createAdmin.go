@@ -29,11 +29,11 @@ var createAdminCmd = &cobra.Command{
 func createAdm(cmd *cobra.Command) error {
 	email, err := cmd.Flags().GetString("email")
 	if err != nil {
-		return fmt.Errorf("can't get email: %w", err)
+		return fmt.Errorf("не удается считать email: %w", err)
 	}
 
 	if email == "" {
-		return fmt.Errorf("email is required")
+		return fmt.Errorf("email является обязательным полем")
 	}
 
 	fmt.Print("Введите пароль: ")
@@ -45,7 +45,7 @@ func createAdm(cmd *cobra.Command) error {
 
 	password := string(pw)
 
-	fmt.Println("\nПовторите пароль: ")
+	fmt.Print("\nПовторите пароль: ")
 
 	pw, err = term.ReadPassword(int(os.Stdin.Fd()))
 	if err != nil {
@@ -56,28 +56,35 @@ func createAdm(cmd *cobra.Command) error {
 		return errors.New("пароли не совпадают")
 	}
 
+	//host=localhost port=5433 - для запуска с хоста
+	//host=postgresdb port=5432 - для запуска с контейнера Го
 	connStr := fmt.Sprintf(
-		"host=postgresdb port=5432 user=%s password=%s dbname=%s sslmode=disable",
-		//TODO: read toml config
-		os.Getenv("DB_USER"),
-		os.Getenv("DB_PASSWORD"),
-		os.Getenv("DB_NAME"),
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+		os.Getenv("POSTGRES_HOST"),
+		os.Getenv("POSTGRES_PORT"),
+		os.Getenv("POSTGRES_USER"),
+		os.Getenv("POSTGRES_PASSWORD"),
+		os.Getenv("POSTGRES_DB"),
 	)
 
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
-		return fmt.Errorf("ошибка инициализации БД: %w", err)
+		return fmt.Errorf("ошибка инициализации БД: %w ", err)
 	}
 
 	defer db.Close()
 
+	/*if err = db.Ping(); err != nil {
+		return fmt.Errorf("нет связи с БД: %w", err)
+	}*/
+
 	s := sqlstore.New(db)
 
 	if err = service.CreateAdmin(s, email, password); err != nil {
-		return fmt.Errorf("can't create user with email %s: %w", email, err)
+		return fmt.Errorf("не удается создать админа с email: %s: %w ", email, err)
 	}
 
-	fmt.Printf("createAdmin successfully done with email: %s", email)
+	fmt.Printf("\ncreateAdmin успешно выполнено с email: %s ", email)
 
 	return nil
 }

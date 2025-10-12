@@ -6,6 +6,7 @@ services:
       - 5433:5432
     volumes:
       - ./storage/postgresDB:/var/lib/postgresql/data/pgdata
+      - ./init:/docker-entrypoint-initdb.d
     restart: unless-stopped
     environment:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}

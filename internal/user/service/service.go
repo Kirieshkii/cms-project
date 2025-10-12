@@ -26,7 +26,7 @@ func CreateAdmin(s storage.Store, email string, password string) error {
 	}
 
 	if err := s.User().Create(u); err != nil {
-		return fmt.Errorf("ошибка создания админа: %w", err)
+		return fmt.Errorf("ошибка записи в БД: %w", err)
 	}
 
 	return nil

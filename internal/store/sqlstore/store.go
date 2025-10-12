@@ -22,7 +22,7 @@ func (s *Store) DB() *sql.DB {
 	return s.db
 }
 
-// User returns the user repository instance, initializing it on first access.
+// User возвращает БД, инициализируя при первом обращении
 func (s *Store) User() storage.UserRepository {
 	if s.userRepository == nil {
 		s.userRepository = NewUserRepository(s)

@@ -3,7 +3,9 @@ package sqlstore
 import (
 	"database/sql"
 
+	storage "github.com/Kirieshkii/cms-project/internal/store"
 	"github.com/Kirieshkii/cms-project/internal/user/model"
+	"github.com/lib/pq"
 )
 
 type UserRepository struct {
@@ -25,6 +27,11 @@ func (r *UserRepository) Create(u *model.User) error {
 		u.Email, u.EncryptedPassword,
 	)
 	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok {
+			if pqErr.Code == "23505" {
+				return storage.ErrUserAlreadyExists
+			}
+		}
 		return err
 	}
 

@@ -3,6 +3,8 @@
 package mocks
 
 import (
+	context "context"
+
 	model "github.com/Kirieshkii/cms-project/internal/user/model"
 	mock "github.com/stretchr/testify/mock"
 )
@@ -12,22 +14,50 @@ type UserRepository struct {
 	mock.Mock
 }
 
-// Create provides a mock function with given fields: _a0
-func (_m *UserRepository) Create(_a0 *model.User) error {
-	ret := _m.Called(_a0)
+// Create provides a mock function with given fields: _a0, _a1
+func (_m *UserRepository) Create(_a0 context.Context, _a1 *model.User) error {
+	ret := _m.Called(_a0, _a1)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Create")
 	}
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(*model.User) error); ok {
-		r0 = rf(_a0)
+	if rf, ok := ret.Get(0).(func(context.Context, *model.User) error); ok {
+		r0 = rf(_a0, _a1)
 	} else {
 		r0 = ret.Error(0)
 	}
 
 	return r0
+}
+
+// GetTokenVersion provides a mock function with given fields: _a0, _a1
+func (_m *UserRepository) GetTokenVersion(_a0 context.Context, _a1 int64) (int, error) {
+	ret := _m.Called(_a0, _a1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetTokenVersion")
+	}
+
+	var r0 int
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) (int, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) int); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // NewUserRepository creates a new instance of UserRepository. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

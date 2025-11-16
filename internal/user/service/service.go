@@ -1,16 +1,18 @@
 package service
 
 import (
+	"context"
 	"fmt"
 
 	storage "github.com/Kirieshkii/cms-project/internal/store"
 	"github.com/Kirieshkii/cms-project/internal/user/model"
 )
 
-func CreateAdmin(s storage.Store, email string, password string) error {
+func CreateAdmin(ctx context.Context, s storage.Store, email string, password string) error {
 
 	u := &model.User{
 		Email: email,
+		Role:  "admin", //мб сделать CreateAdmin более универсальной функцией и создавать любого пользователя
 	}
 
 	if err := u.ValidateEmail(); err != nil {
@@ -25,7 +27,7 @@ func CreateAdmin(s storage.Store, email string, password string) error {
 		return fmt.Errorf("ошибка хеширования пароля: %w", err)
 	}
 
-	if err := s.User().Create(u); err != nil {
+	if err := s.User().Create(ctx, u); err != nil {
 		return fmt.Errorf("ошибка записи в БД: %w", err)
 	}
 

@@ -1,6 +1,7 @@
 package service_test
 
 import (
+	"context"
 	"testing"
 
 	storage "github.com/Kirieshkii/cms-project/internal/store"
@@ -77,7 +78,7 @@ func TestCreateAdmin(t *testing.T) {
 					Return(tc.mockErr).Once()
 			}
 
-			err := service.CreateAdmin(storeMock, tc.email, tc.password)
+			err := service.CreateAdmin(context.Background(), storeMock, tc.email, tc.password)
 
 			if tc.expErr {
 				assert.Error(t, err)

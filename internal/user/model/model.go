@@ -10,9 +10,11 @@ import (
 )
 
 type User struct {
-	ID                int    `json:"id"`
+	ID                int64  `json:"id"`
 	Email             string `json:"email"`
 	EncryptedPassword string `json:"-"`
+	Role              string `json:"role"`
+	TokenVersion      int    `json:"tokenversion"`
 }
 
 // Validate валидирует полученного пользователя по email и длине password

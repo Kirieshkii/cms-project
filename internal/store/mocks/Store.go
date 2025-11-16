@@ -7,5 +7,5 @@ type Store struct {
 }
 
 func (s *Store) User() storage.UserRepository {
-	return s.UserRepo
+	return s.UserRepo //перемокать UserRepository
 }

@@ -1,61 +1,75 @@
-package repoitory_test
+package tests
 
 import (
-	"database/sql"
+	"context"
 	"fmt"
-	mathrand "math/rand"
-	"os"
+	"math/rand"
 	"testing"
 
-	_ "github.com/lib/pq"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	storage "github.com/Kirieshkii/cms-project/internal/store"
-	"github.com/Kirieshkii/cms-project/internal/store/sqlstore"
+	"github.com/Kirieshkii/cms-project/internal/store/pgxstore"
 	"github.com/Kirieshkii/cms-project/internal/user/model"
 )
 
-const (
-// testDBname = "testdb"
-)
+type UserRepositoryTestSuite struct {
+	DBTestSuite
+	Store storage.Store
+}
 
-func TestCreate(t *testing.T) {
-	//testcase
+func TestUserRepositoryTestSuite(t *testing.T) {
+	suite.Run(t, new(UserRepositoryTestSuite))
+}
+
+func (s *UserRepositoryTestSuite) SetupSuite() {
+	// Инициализация пула и запуск миграций
+	s.DBTestSuite.SetupSuite()
+
+	// Инициализация Store
+	s.Store = pgxstore.New(s.Pool)
+
+	fmt.Println("✅ Store и пул подключений успешно инициализированы")
+}
+
+func (s *UserRepositoryTestSuite) SetupTest() {
+	// Очищаем таблицу users перед каждым тестом
+	err := CleanupTables(context.Background(), s.Pool, "users")
+	if err != nil {
+		s.T().Fatalf("❌ Не удалось очистить таблицу users: %v", err)
+	}
+
+	fmt.Println("🧹 Таблица users очищена перед тестом")
+}
+
+func (s *UserRepositoryTestSuite) TestCreateUser() {
+	ctx := context.Background()
 	u := &model.User{
 		Email:             RandEmail(),
 		EncryptedPassword: "encryptedpassword",
 	}
 
-	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		os.Getenv("POSTGRES_HOST"),
-		os.Getenv("POSTGRES_PORT"),
-		os.Getenv("POSTGRES_USER"),
-		os.Getenv("POSTGRES_PASSWORD"),
-		os.Getenv("POSTGRES_DB"))
+	fmt.Printf("🔹 Создаем пользователя с email: %s\n", u.Email)
+	err := s.Store.User().Create(ctx, u)
+	s.Require().NoError(err, "❌ Ошибка при создании пользователя")
 
-	db, err := sql.Open("postgres", connStr)
-	require.NoError(t, err)
+	// Получаем версию токена
+	version, err := s.Store.User().GetTokenVersion(ctx, u.ID)
+	s.Require().NoError(err, "❌ Ошибка при получении версии токена")
+	s.Assert().Equal(1, version, "❌ Неверная версия токена по умолчанию")
 
-	t.Cleanup(func() {
-		_ = db.Close()
-	})
+	fmt.Println("✅ Пользователь успешно создан, версия токена проверена")
 
-	err = db.Ping()
-	require.NoError(t, err)
+	// Повторное создание → должно вернуть ErrUserAlreadyExists
+	fmt.Printf("🔹 Пытаемся создать пользователя с тем же email: %s\n", u.Email)
+	err = s.Store.User().Create(ctx, u)
+	s.Require().ErrorIs(err, storage.ErrUserAlreadyExists, "❌ Повторное создание пользователя не вернуло ожидаемую ошибку")
 
-	//Create
-	s := sqlstore.New(db)
-
-	err = s.User().Create(u)
-	assert.NoError(t, err)
-
-	err = s.User().Create(u)
-	assert.ErrorIs(t, err, storage.ErrUserAlreadyExists)
-
+	fmt.Println("✅ Проверка дубликата пользователя прошла успешно")
 }
 
+// Генерация случайного email
 func RandEmail() string {
-	n := mathrand.Intn(10000)
+	n := rand.Intn(10000)
 	return fmt.Sprintf("test%d@gmail.com", n)
 }

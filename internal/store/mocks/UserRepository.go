@@ -32,6 +32,66 @@ func (_m *UserRepository) Create(_a0 context.Context, _a1 *model.User) error {
 	return r0
 }
 
+// FindByEmail provides a mock function with given fields: _a0, _a1
+func (_m *UserRepository) FindByEmail(_a0 context.Context, _a1 string) (*model.User, error) {
+	ret := _m.Called(_a0, _a1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByEmail")
+	}
+
+	var r0 *model.User
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (*model.User, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) *model.User); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*model.User)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// FindByID provides a mock function with given fields: _a0, _a1
+func (_m *UserRepository) FindByID(_a0 context.Context, _a1 int64) (*model.User, error) {
+	ret := _m.Called(_a0, _a1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FindByID")
+	}
+
+	var r0 *model.User
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) (*model.User, error)); ok {
+		return rf(_a0, _a1)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, int64) *model.User); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*model.User)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, int64) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetTokenVersion provides a mock function with given fields: _a0, _a1
 func (_m *UserRepository) GetTokenVersion(_a0 context.Context, _a1 int64) (int, error) {
 	ret := _m.Called(_a0, _a1)
@@ -58,6 +118,24 @@ func (_m *UserRepository) GetTokenVersion(_a0 context.Context, _a1 int64) (int, 
 	}
 
 	return r0, r1
+}
+
+// UpdateTokenVersion provides a mock function with given fields: _a0, _a1
+func (_m *UserRepository) UpdateTokenVersion(_a0 context.Context, _a1 int64) error {
+	ret := _m.Called(_a0, _a1)
+
+	if len(ret) == 0 {
+		panic("no return value specified for UpdateTokenVersion")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, int64) error); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
 }
 
 // NewUserRepository creates a new instance of UserRepository. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.

@@ -10,4 +10,7 @@ import (
 type UserRepository interface {
 	Create(context.Context, *model.User) error
 	GetTokenVersion(context.Context, int64) (int, error)
+	FindByEmail(context.Context, string) (*model.User, error)
+	FindByID(context.Context, int64) (*model.User, error)
+	UpdateTokenVersion(context.Context, int64) error
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/Kirieshkii/cms-project/internal/user/model"
 
 	"github.com/jackc/pgconn"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -52,4 +53,78 @@ func (r *UserRepository) GetTokenVersion(ctx context.Context, id int64) (int, er
 	}
 
 	return version, nil
+}
+
+// FindByEmail находит пользователя по email
+func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*model.User, error) {
+	const q = `
+		SELECT id, email, encrypted_password, role, token_version
+		FROM users
+		WHERE email = $1
+	`
+
+	u := &model.User{}
+	err := r.pool.QueryRow(ctx, q, email).Scan(
+		&u.ID,
+		&u.Email,
+		&u.EncryptedPassword,
+		&u.Role,
+		&u.TokenVersion,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, storage.ErrUserNotFound
+		}
+		return nil, err
+	}
+
+	return u, nil
+}
+
+// FindByID находит пользователя по ID
+func (r *UserRepository) FindByID(ctx context.Context, id int64) (*model.User, error) {
+	const q = `
+		SELECT id, email, encrypted_password, role, token_version
+		FROM users
+		WHERE id = $1
+	`
+
+	u := &model.User{}
+	err := r.pool.QueryRow(ctx, q, id).Scan(
+		&u.ID,
+		&u.Email,
+		&u.EncryptedPassword,
+		&u.Role,
+		&u.TokenVersion,
+	)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, storage.ErrUserNotFound
+		}
+		return nil, err
+	}
+
+	return u, nil
+}
+
+// UpdateTokenVersion инкрементирует token_version пользователя
+func (r *UserRepository) UpdateTokenVersion(ctx context.Context, id int64) error {
+	const q = `
+		UPDATE users
+		SET token_version = token_version + 1
+		WHERE id = $1
+	`
+
+	result, err := r.pool.Exec(ctx, q, id)
+	if err != nil {
+		return err
+	}
+
+	if result.RowsAffected() == 0 {
+		return storage.ErrUserNotFound
+	}
+
+	return nil
 }

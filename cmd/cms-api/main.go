@@ -37,12 +37,29 @@ func main() {
 	authService := auth.NewAuthService(cfgJWT.Secret, cfgJWT.AccessTTL, cfgJWT.RefreshTTL, s.User())
 
 	// Redis
-	rdb := config.NewRedisClient()
+	rdb, err := config.NewRedisClient(ctx)
+	if err != nil {
+		log.Fatalf("ошибка инициализации Redis: %v", err)
+	}
+	defer rdb.Close()
 	authService.SetRedis(rdb)
 
 	// Router
 	r := gin.Default()
 
-	_ = r
-	_ = authService
+	// Auth handlers + routes
+	authHandler := auth.NewHandler(authService, s.User())
+	authGroup := r.Group("/api/v1/auth")
+	{
+		authGroup.POST("/login", authHandler.Login)
+		authGroup.POST("/refresh", authHandler.Refresh)
+
+		protected := authGroup.Use(auth.AuthMiddleware(authService))
+		protected.POST("/logout", authHandler.Logout)
+		protected.GET("/profile", authHandler.Profile)
+	}
+
+	if err := r.Run(); err != nil {
+		log.Fatalf("ошибка запуска HTTP сервера: %v", err)
+	}
 }

@@ -114,7 +114,7 @@ func (s *AuthService) ValidateRefreshToken(ctx context.Context, tokenStr string)
 
 	// Проверка blacklist (granular logout)
 	if s.redisClient != nil {
-		isBlacklisted, err := s.redisClient.Exists(context.Background(),
+		isBlacklisted, err := s.redisClient.Exists(ctx,
 			fmt.Sprintf("blacklist:jti:%s", claims.ID)).
 			Result()
 		if err != nil {
@@ -155,5 +155,6 @@ func (s *AuthService) RevokeRefreshToken(ctx context.Context, claims *RefreshCla
 	}
 
 	key := fmt.Sprintf("blacklist:jti:%s", claims.ID)
+
 	return s.redisClient.Set(ctx, key, true, ttl).Err()
 }

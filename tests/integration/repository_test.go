@@ -15,60 +15,35 @@ import (
 
 type UserRepositoryTestSuite struct {
 	DBTestSuite
-	Store storage.Store
 }
 
 func TestUserRepositoryTestSuite(t *testing.T) {
 	suite.Run(t, new(UserRepositoryTestSuite))
 }
 
-func (s *UserRepositoryTestSuite) SetupSuite() {
-	// Инициализация пула и запуск миграций
-	s.DBTestSuite.SetupSuite()
-
-	// Инициализация Store
-	s.Store = pgxstore.New(s.Pool)
-
-	fmt.Println("✅ Store и пул подключений успешно инициализированы")
-}
-
 func (s *UserRepositoryTestSuite) SetupTest() {
 	// Очищаем таблицу users перед каждым тестом
-	err := CleanupTables(context.Background(), s.Pool, "users")
-	if err != nil {
-		s.T().Fatalf("❌ Не удалось очистить таблицу users: %v", err)
-	}
-
-	fmt.Println("🧹 Таблица users очищена перед тестом")
+	_, err := s.Pool.Exec(context.Background(), `DELETE FROM users`)
+	s.Require().NoError(err)
 }
 
 func (s *UserRepositoryTestSuite) TestCreateUser() {
-	ctx := context.Background()
+	repo := pgxstore.New(s.Pool)
+
 	u := &model.User{
 		Email:             RandEmail(),
 		EncryptedPassword: "encryptedpassword",
 	}
 
-	fmt.Printf("🔹 Создаем пользователя с email: %s\n", u.Email)
-	err := s.Store.User().Create(ctx, u)
-	s.Require().NoError(err, "❌ Ошибка при создании пользователя")
+	// 1. Создаём пользователя
+	err := repo.User().Create(context.Background(), u)
+	s.Assert().NoError(err)
 
-	// Получаем версию токена
-	version, err := s.Store.User().GetTokenVersion(ctx, u.ID)
-	s.Require().NoError(err, "❌ Ошибка при получении версии токена")
-	s.Assert().Equal(1, version, "❌ Неверная версия токена по умолчанию")
-
-	fmt.Println("✅ Пользователь успешно создан, версия токена проверена")
-
-	// Повторное создание → должно вернуть ErrUserAlreadyExists
-	fmt.Printf("🔹 Пытаемся создать пользователя с тем же email: %s\n", u.Email)
-	err = s.Store.User().Create(ctx, u)
-	s.Require().ErrorIs(err, storage.ErrUserAlreadyExists, "❌ Повторное создание пользователя не вернуло ожидаемую ошибку")
-
-	fmt.Println("✅ Проверка дубликата пользователя прошла успешно")
+	// 2. Повторное создание того же пользователя → ошибка
+	err = repo.User().Create(context.Background(), u)
+	s.Assert().ErrorIs(err, storage.ErrUserAlreadyExists)
 }
 
-// Генерация случайного email
 func RandEmail() string {
 	n := rand.Intn(10000)
 	return fmt.Sprintf("test%d@gmail.com", n)

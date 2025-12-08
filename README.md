@@ -14,7 +14,7 @@
 Вход в консоль контейнера Golang:
 >docker exec -it golang sh
 Запуск тестов:
->cd /app && go test ./... -v
+>go test /app/... -v
 
 Используемая версия mockery 2.53.5:
 >go install github.com/vektra/mockery/v2@v2.53.5

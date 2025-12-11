@@ -54,9 +54,8 @@ func main() {
 		authGroup.POST("/login", authHandler.Login)
 		authGroup.POST("/refresh", authHandler.Refresh)
 
-		protected := authGroup.Use(auth.AuthMiddleware(authService))
-		protected.POST("/logout", authHandler.Logout)
-		protected.GET("/profile", authHandler.Profile)
+		authGroup.POST("/logout", authHandler.Logout)
+		authGroup.GET("/profile", auth.AuthMiddleware(authService), authHandler.Profile)
 	}
 
 	if err := r.Run(); err != nil {

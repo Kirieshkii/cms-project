@@ -31,9 +31,9 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
-// LogoutRequest структура запроса для logout (refresh_token опционален)
+// LogoutRequest структура запроса для logout (refresh_token обязателен)
 type LogoutRequest struct {
-	RefreshToken string `json:"refresh_token"`
+	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
 // ProfileResponse структура ответа для profile
@@ -134,43 +134,24 @@ func (h *Handler) Refresh(c *gin.Context) {
 
 // POST /api/v1/auth/logout
 func (h *Handler) Logout(c *gin.Context) {
-	// Получаем claims из middleware
-	claims, exists := c.Get("claims")
-	if !exists {
-		RespondUnauthorized(c, "Не авторизован")
-		return
-	}
-
-	//возможно стоит добавить интерфейс, чтобы не улететь в панику при неверном типе во время приведения
-	accessClaims, ok := claims.(*AccessClaims)
-	if !ok {
-		RespondUnauthorized(c, "Не авторизован")
-		return
-	}
-
 	ctx := c.Request.Context()
 
-	// Пытаемся получить refresh_token из body (опционально)
 	var req LogoutRequest
-	c.ShouldBindJSON(&req) // Игнорируем ошибку, т.к. body опционален
-
-	// Если refresh_token передан - добавляем в blacklist (granular logout)
-	if req.RefreshToken != "" {
-		refreshClaims, err := h.authService.ValidateRefreshToken(ctx, req.RefreshToken)
-		if err == nil {
-			// Валидируем, что refresh token принадлежит тому же пользователю
-			if refreshClaims.UserID == accessClaims.UserID {
-				// Добавляем refresh token в blacklist
-				if err := h.authService.RevokeRefreshToken(ctx, refreshClaims); err != nil {
-					// Если Redis недоступен, логируем, но продолжаем
-				}
-			}
-		}
-		// Если refresh token невалиден, просто игнорируем его
+	if err := c.ShouldBindJSON(&req); err != nil {
+		RespondBadRequest(c, "refresh_token обязателен")
+		return
 	}
 
-	// НЕ инкрементируем token_version (granular logout)
-	// Если нужен глобальный logout (сброс пароля), это делается отдельным методом
+	refreshClaims, err := h.authService.ValidateRefreshToken(ctx, req.RefreshToken)
+	if err != nil {
+		RespondWithError(c, http.StatusUnauthorized, ErrCodeInvalidToken, "Неверный или истекший refresh токен")
+		return
+	}
+
+	if err := h.authService.RevokeRefreshToken(ctx, refreshClaims); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
+		return
+	}
 
 	c.Status(http.StatusNoContent)
 }

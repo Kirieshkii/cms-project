@@ -3,7 +3,7 @@ package tests
 import (
 	"context"
 	"fmt"
-	"math/rand"
+	mathrand "math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -45,6 +45,6 @@ func (s *UserRepositoryTestSuite) TestCreateUser() {
 }
 
 func RandEmail() string {
-	n := rand.Intn(10000)
+	n := mathrand.Intn(10000)
 	return fmt.Sprintf("test%d@gmail.com", n)
 }

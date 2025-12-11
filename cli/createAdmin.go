@@ -10,7 +10,6 @@ import (
 	"log"
 	"os"
 
-	// <- здесь
 	"github.com/Kirieshkii/cms-project/internal/db"
 	"github.com/Kirieshkii/cms-project/internal/store/pgxstore"
 	"github.com/Kirieshkii/cms-project/internal/user/service"

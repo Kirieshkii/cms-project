@@ -12,16 +12,15 @@ import (
 	"github.com/Kirieshkii/cms-project/internal/user/model"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/redis/go-redis/v9"
 )
 
 type AuthService struct {
-	jwtSecret   []byte
-	accessTTL   time.Duration
-	refreshTTL  time.Duration
-	redisClient *redis.Client          // для blacklist refresh-токенов
-	userRepo    storage.UserRepository // для проверки tokenVersion у пользователя
-	logger      *slog.Logger           // для логирования
+	jwtSecret     []byte
+	accessTTL     time.Duration
+	refreshTTL    time.Duration
+	blacklistRepo storage.TokenBlacklistRepository // для blacklist refresh-токенов
+	userRepo      storage.UserRepository           // для проверки tokenVersion у пользователя
+	logger        *slog.Logger                     // для логирования
 }
 
 type TokenPair struct {
@@ -39,8 +38,8 @@ func NewAuthService(secret []byte, accessTTL, refreshTTL time.Duration, userRepo
 	}
 }
 
-func (s *AuthService) SetRedis(rdb *redis.Client) {
-	s.redisClient = rdb
+func (s *AuthService) SetBlacklistRepo(repo storage.TokenBlacklistRepository) {
+	s.blacklistRepo = repo
 }
 
 func (s *AuthService) SetLogger(logger *slog.Logger) {
@@ -126,16 +125,15 @@ func (s *AuthService) ValidateRefreshToken(ctx context.Context, tokenStr string)
 	}
 
 	// Проверка blacklist (granular logout)
-	if s.redisClient != nil {
-		key := fmt.Sprintf("blacklist:jti:%s", claims.ID)
-		isBlacklisted, err := s.redisClient.Exists(ctx, key).Result()
+	if s.blacklistRepo != nil {
+		isBlacklisted, err := s.blacklistRepo.IsBlacklisted(ctx, claims.ID)
 		if err != nil {
 			if s.logger != nil {
-				s.logger.Error("ошибка проверки blacklist в Redis", "error", err, "jti", claims.ID, "key", key)
+				s.logger.Error("ошибка проверки blacklist", "error", err, "jti", claims.ID)
 			}
 			return nil, err
 		}
-		if isBlacklisted > 0 {
+		if isBlacklisted {
 			if s.logger != nil {
 				s.logger.Debug("refresh token находится в blacklist", "jti", claims.ID, "user_id", claims.UserID)
 			}
@@ -146,7 +144,7 @@ func (s *AuthService) ValidateRefreshToken(ctx context.Context, tokenStr string)
 		}
 	} else {
 		if s.logger != nil {
-			s.logger.Debug("Redis не сконфигурирован, пропускаем проверку blacklist", "jti", claims.ID)
+			s.logger.Debug("blacklist репозиторий не сконфигурирован, пропускаем проверку blacklist", "jti", claims.ID)
 		}
 	}
 
@@ -181,11 +179,11 @@ func (s *AuthService) ValidateRefreshToken(ctx context.Context, tokenStr string)
 }
 
 func (s *AuthService) RevokeRefreshToken(ctx context.Context, claims *RefreshClaims) error {
-	if s.redisClient == nil {
+	if s.blacklistRepo == nil {
 		if s.logger != nil {
-			s.logger.Error("попытка отозвать токен, но Redis не сконфигурирован", "jti", claims.ID, "user_id", claims.UserID)
+			s.logger.Error("попытка отозвать токен, но blacklist репозиторий не сконфигурирован", "jti", claims.ID, "user_id", claims.UserID)
 		}
-		return errors.New("redis не сконфигурирован")
+		return errors.New("blacklist репозиторий не сконфигурирован")
 	}
 
 	// TTL = время до истечения токена
@@ -198,18 +196,16 @@ func (s *AuthService) RevokeRefreshToken(ctx context.Context, claims *RefreshCla
 		return nil
 	}
 
-	key := fmt.Sprintf("blacklist:jti:%s", claims.ID)
-
-	err := s.redisClient.Set(ctx, key, true, ttl).Err()
+	err := s.blacklistRepo.AddToBlacklist(ctx, claims.ID, ttl)
 	if err != nil {
 		if s.logger != nil {
-			s.logger.Error("ошибка добавления токена в blacklist Redis", "error", err, "jti", claims.ID, "user_id", claims.UserID, "key", key, "ttl", ttl)
+			s.logger.Error("ошибка добавления токена в blacklist", "error", err, "jti", claims.ID, "user_id", claims.UserID, "ttl", ttl)
 		}
 		return err
 	}
 
 	if s.logger != nil {
-		s.logger.Debug("токен успешно добавлен в blacklist", "jti", claims.ID, "user_id", claims.UserID, "key", key, "ttl", ttl)
+		s.logger.Debug("токен успешно добавлен в blacklist", "jti", claims.ID, "user_id", claims.UserID, "ttl", ttl)
 	}
 
 	return nil

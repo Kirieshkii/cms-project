@@ -15,6 +15,7 @@ import (
 	"github.com/Kirieshkii/cms-project/internal/logger"
 	"github.com/Kirieshkii/cms-project/internal/middleware"
 	"github.com/Kirieshkii/cms-project/internal/store/pgxstore"
+	"github.com/Kirieshkii/cms-project/internal/store/redisstore"
 	"github.com/gin-gonic/gin"
 )
 
@@ -76,7 +77,10 @@ func main() {
 	}
 	// Не используем defer - закрываем вручную при graceful shutdown
 	logger.Info("Redis клиент успешно инициализирован")
-	authService.SetRedis(rdb)
+
+	// Создаем репозиторий для blacklist токенов
+	blacklistRepo := redisstore.NewTokenBlacklistRepository(rdb)
+	authService.SetBlacklistRepo(blacklistRepo)
 
 	// Router
 	// Используем gin.New() вместо gin.Default(), чтобы избежать дублирования логов

@@ -1,8 +1,8 @@
 # 1. Базовый образ Go
 FROM golang:1.25.1-alpine3.22
 
-# 1.1 Устанавливаем git и ca-certificates
-RUN apk add --no-cache git ca-certificates
+# 1.1 Устанавливаем git, ca-certificates и wget (для healthcheck)
+RUN apk add --no-cache git ca-certificates wget
 
 
 # 2. Устанавливаем migrate

@@ -34,3 +34,18 @@
 
 Запуск сервера
 >go -C /app run ./cmd/cms-api/main.go
+
+
+Как проверить Redis/ключи вручную (отладка)
+После вызова /logout в контейнере (или локально, если redis контейнер работает):
+# зайти в redis контейнер (или локально)
+docker exec -it redis sh
+# или подключиться с хоста
+redis-cli -h 127.0.0.1 -p 6379 -a rpass
+
+# найти ключи blacklist
+KEYS blacklist:jti:*
+# посмотреть конкретный ключ
+GET blacklist:jti:<jti-value>   # вернёт "true"
+TTL blacklist:jti:<jti-value>
+Если ключа нет — Revoke не сработал.

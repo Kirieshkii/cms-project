@@ -4,9 +4,9 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
 	"os"
 
+	"github.com/Kirieshkii/cms-project/internal/logger"
 	"github.com/spf13/cobra"
 )
 
@@ -28,9 +28,12 @@ to quickly create a Cobra application.`,
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
+	// Инициализация логгера для CLI (используем local для удобочитаемого вывода)
+	log := logger.SetupLogger("local")
+
 	err := rootCmd.Execute()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Ошибка: %v\n", err)
+		log.Error("ошибка выполнения команды", "error", err)
 		os.Exit(1)
 	}
 }

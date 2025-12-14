@@ -78,7 +78,7 @@ func TestCreateAdmin(t *testing.T) {
 					Return(tc.mockErr).Once()
 			}
 
-			err := service.CreateAdmin(context.Background(), storeMock, tc.email, tc.password)
+			err := service.CreateAdmin(context.Background(), storeMock, tc.email, tc.password, nil)
 
 			if tc.expErr {
 				assert.Error(t, err)

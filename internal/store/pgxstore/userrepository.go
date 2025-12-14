@@ -17,7 +17,9 @@ type UserRepository struct {
 }
 
 func NewUserRepository(pool *pgxpool.Pool) storage.UserRepository {
-	return &UserRepository{pool: pool}
+	return &UserRepository{
+		pool: pool,
+	}
 }
 
 func (r *UserRepository) Create(ctx context.Context, u *model.User) error {
@@ -34,8 +36,10 @@ func (r *UserRepository) Create(ctx context.Context, u *model.User) error {
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			// ErrUserAlreadyExists - бизнес-ошибка, не логируем (логируется на уровне Service/Handler)
 			return storage.ErrUserAlreadyExists
 		}
+		// Возвращаем ошибку без логирования - логирование на уровне Service/Handler
 		return err
 	}
 
@@ -49,6 +53,7 @@ func (r *UserRepository) GetTokenVersion(ctx context.Context, id int64) (int, er
 	var version int
 	err := r.pool.QueryRow(ctx, q, id).Scan(&version)
 	if err != nil {
+		// Возвращаем ошибку без логирования - логирование на уровне Service/Handler
 		return 0, err
 	}
 
@@ -74,8 +79,10 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*model.
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			// ErrUserNotFound - бизнес-ошибка, не логируем (логируется на уровне Handler)
 			return nil, storage.ErrUserNotFound
 		}
+		// Возвращаем ошибку без логирования - логирование на уровне Handler
 		return nil, err
 	}
 
@@ -101,8 +108,10 @@ func (r *UserRepository) FindByID(ctx context.Context, id int64) (*model.User, e
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			// ErrUserNotFound - бизнес-ошибка, не логируем (логируется на уровне Handler)
 			return nil, storage.ErrUserNotFound
 		}
+		// Возвращаем ошибку без логирования - логирование на уровне Handler
 		return nil, err
 	}
 
@@ -119,10 +128,12 @@ func (r *UserRepository) UpdateTokenVersion(ctx context.Context, id int64) error
 
 	result, err := r.pool.Exec(ctx, q, id)
 	if err != nil {
+		// Возвращаем ошибку без логирования - логирование на уровне Service/Handler
 		return err
 	}
 
 	if result.RowsAffected() == 0 {
+		// ErrUserNotFound - бизнес-ошибка, не логируем (логируется на уровне Service/Handler)
 		return storage.ErrUserNotFound
 	}
 

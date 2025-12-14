@@ -7,10 +7,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/Kirieshkii/cms-project/internal/db"
+	"github.com/Kirieshkii/cms-project/internal/logger"
 	"github.com/Kirieshkii/cms-project/internal/store/pgxstore"
 	"github.com/Kirieshkii/cms-project/internal/user/service"
 	"github.com/spf13/cobra"
@@ -29,6 +29,9 @@ var createAdminCmd = &cobra.Command{
 
 func createAdm(cmd *cobra.Command) error {
 	ctx := context.Background() // создаём контекст для всей операции
+
+	// Инициализация логгера для CLI (используем local для удобочитаемого вывода)
+	log := logger.SetupLogger("local")
 
 	email, err := cmd.Flags().GetString("email")
 	if err != nil {
@@ -60,12 +63,14 @@ func createAdm(cmd *cobra.Command) error {
 	// Инициализация пула pgxpool
 	dsn, err := db.BuildDSNFromEnv()
 	if err != nil {
-		log.Fatalf("ошибка сборки DSN: %v", err)
+		log.Error("ошибка сборки DSN", "error", err)
+		os.Exit(1)
 	}
 
 	pool, err := db.NewPool(ctx, dsn) // явная проверка ошибки
 	if err != nil {
-		log.Fatalf("ошибка инициализации пула БД: %v", err)
+		log.Error("ошибка инициализации пула БД", "error", err)
+		os.Exit(1)
 	}
 	defer pool.Close()
 
@@ -73,11 +78,11 @@ func createAdm(cmd *cobra.Command) error {
 	store := pgxstore.New(pool)
 
 	// Создаём админа через сервис с прокидыванием ctx
-	if err := service.CreateAdmin(ctx, store, email, password); err != nil {
+	if err := service.CreateAdmin(ctx, store, email, password, log); err != nil {
 		return fmt.Errorf("не удается создать админа с email %s: %w", email, err)
 	}
 
-	fmt.Printf("\ncreateAdmin успешно выполнено с email: %s\n", email)
+	log.Info("createAdmin успешно выполнено", "email", email)
 	return nil
 }
 

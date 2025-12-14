@@ -1,4 +1,5 @@
 /storage/postgresDB
+/storage/redis
 /.env
 /storage/.DS_Store
 
@@ -27,3 +28,7 @@ Icon[]
 Network Trash Folder
 Temporary Items
 .apdisk
+
+# Force include env examples (override global ignores)
+!.env.example
+!.env.test

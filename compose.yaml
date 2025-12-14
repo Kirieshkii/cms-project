@@ -1,3 +1,7 @@
+networks:
+  cms-net:
+    driver: bridge
+
 services:
   postgresdb:
     image: postgres:18.0-alpine3.22
@@ -6,30 +10,72 @@ services:
       - 5433:5432
     volumes:
       - ./storage/postgresDB:/var/lib/postgresql/data/pgdata
+      - ./init:/docker-entrypoint-initdb.d
     restart: unless-stopped
     environment:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_DB=${POSTGRES_DB}
+    networks:
+      - cms-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  redis:
+    image: redis:8.2.2-alpine
+    container_name: redis
+    ports:
+      - 6379:6379
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    volumes:
+      - ./storage/redis:/data
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    restart: unless-stopped
+    networks:
+      - cms-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
   golang:
-    image: golang:1.25.1-alpine3.22
+    build: .
     container_name: golang
     ports:
       - 8080:8080
     volumes:
-      - .:/app
+      - .:/app        # пробрасываем проект для live-reload
     working_dir: /app
     restart: unless-stopped
+    depends_on:
+      postgresdb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
+      # Postgres
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_HOST=postgresdb
       - POSTGRES_PORT=${POSTGRES_PORT}
-    command:
-      - sh
-      - -c
-      - |
-        go mod download
-        echo '✅ Зависимости в go.mod загружены'
-        sleep infinity
+
+      # JWT
+      - JWT_SECRET=${JWT_SECRET}
+      - ACCESS_TOKEN_TTL=${ACCESS_TOKEN_TTL}
+      - REFRESH_TOKEN_TTL=${REFRESH_TOKEN_TTL}
+
+      # Redis
+      - REDIS_HOST=redis
+      - REDIS_PORT=${REDIS_PORT}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    networks:
+      - cms-net
+    # Healthcheck не нужен, так как сервер запускается вручную, а не автоматически при старте контейнера
+

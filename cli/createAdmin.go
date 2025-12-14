@@ -4,14 +4,15 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"database/sql"
+	"context"
 	"errors"
 	"fmt"
 	"os"
 
-	"github.com/Kirieshkii/cms-project/internal/store/sqlstore"
+	"github.com/Kirieshkii/cms-project/internal/db"
+	"github.com/Kirieshkii/cms-project/internal/logger"
+	"github.com/Kirieshkii/cms-project/internal/store/pgxstore"
 	"github.com/Kirieshkii/cms-project/internal/user/service"
-	_ "github.com/lib/pq"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -27,6 +28,11 @@ var createAdminCmd = &cobra.Command{
 }
 
 func createAdm(cmd *cobra.Command) error {
+	ctx := context.Background() // создаём контекст для всей операции
+
+	// Инициализация логгера для CLI (используем local для удобочитаемого вывода)
+	log := logger.SetupLogger("local")
+
 	email, err := cmd.Flags().GetString("email")
 	if err != nil {
 		return fmt.Errorf("не удается считать email: %w", err)
@@ -42,7 +48,6 @@ func createAdm(cmd *cobra.Command) error {
 	if err != nil {
 		return fmt.Errorf("ошибка чтения пароля: %w", err)
 	}
-
 	password := string(pw)
 
 	fmt.Print("\nПовторите пароль: ")
@@ -51,56 +56,37 @@ func createAdm(cmd *cobra.Command) error {
 	if err != nil {
 		return fmt.Errorf("ошибка чтения пароля: %w", err)
 	}
-
 	if password != string(pw) {
 		return errors.New("пароли не совпадают")
 	}
 
-	//host=localhost port=5433 - для запуска с хоста
-	//host=postgresdb port=5432 - для запуска с контейнера Го
-	connStr := fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		os.Getenv("POSTGRES_HOST"),
-		os.Getenv("POSTGRES_PORT"),
-		os.Getenv("POSTGRES_USER"),
-		os.Getenv("POSTGRES_PASSWORD"),
-		os.Getenv("POSTGRES_DB"),
-	)
-
-	db, err := sql.Open("postgres", connStr)
+	// Инициализация пула pgxpool
+	dsn, err := db.BuildDSNFromEnv()
 	if err != nil {
-		return fmt.Errorf("ошибка инициализации БД: %w ", err)
+		log.Error("ошибка сборки DSN", "error", err)
+		os.Exit(1)
 	}
 
-	defer db.Close()
+	pool, err := db.NewPool(ctx, dsn) // явная проверка ошибки
+	if err != nil {
+		log.Error("ошибка инициализации пула БД", "error", err)
+		os.Exit(1)
+	}
+	defer pool.Close()
 
-	/*if err = db.Ping(); err != nil {
-		return fmt.Errorf("нет связи с БД: %w", err)
-	}*/
+	// Создаём хранилище
+	store := pgxstore.New(pool)
 
-	s := sqlstore.New(db)
-
-	if err = service.CreateAdmin(s, email, password); err != nil {
-		return fmt.Errorf("не удается создать админа с email: %s: %w ", email, err)
+	// Создаём админа через сервис с прокидыванием ctx
+	if err := service.CreateAdmin(ctx, store, email, password, log); err != nil {
+		return fmt.Errorf("не удается создать админа с email %s: %w", email, err)
 	}
 
-	fmt.Printf("\ncreateAdmin успешно выполнено с email: %s ", email)
-
+	log.Info("createAdmin успешно выполнено", "email", email)
 	return nil
 }
 
 func init() {
 	rootCmd.AddCommand(createAdminCmd)
-
 	createAdminCmd.Flags().String("email", "", "Email of the new admin")
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// createAdminCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// createAdminCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

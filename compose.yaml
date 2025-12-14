@@ -77,11 +77,5 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
     networks:
       - cms-net
-    #TODO: Проверить параметры
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+    # Healthcheck не нужен, так как сервер запускается вручную, а не автоматически при старте контейнера
 

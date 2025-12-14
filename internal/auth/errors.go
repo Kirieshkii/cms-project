@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -15,7 +16,15 @@ type ErrorDetail struct {
 	Message string `json:"message"`
 }
 
-// Error codes
+// Доменные ошибки (возвращаются из сервиса)
+var (
+	ErrInvalidCredentials   = errors.New("неверный email или пароль")
+	ErrInvalidToken         = errors.New("неверный или истекший токен")
+	ErrTokenExpired         = errors.New("токен истек")
+	ErrTokenVersionMismatch = errors.New("версия токена не совпадает")
+)
+
+// Error codes (для HTTP ответов)
 const (
 	ErrCodeInvalidCredentials = "invalid_credentials"
 	ErrCodeUnauthorized       = "unauthorized"

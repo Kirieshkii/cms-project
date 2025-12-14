@@ -3,23 +3,19 @@ package auth
 import (
 	"log/slog"
 	"net/http"
-	"strconv"
 
 	"github.com/Kirieshkii/cms-project/internal/middleware"
-	storage "github.com/Kirieshkii/cms-project/internal/store"
 	"github.com/gin-gonic/gin"
 )
 
 type Handler struct {
 	authService *AuthService
-	userRepo    storage.UserRepository
 	logger      *slog.Logger
 }
 
-func NewHandler(authService *AuthService, userRepo storage.UserRepository, logger *slog.Logger) *Handler {
+func NewHandler(authService *AuthService, logger *slog.Logger) *Handler {
 	return &Handler{
 		authService: authService,
-		userRepo:    userRepo,
 		logger:      logger,
 	}
 }
@@ -65,14 +61,14 @@ func (h *Handler) Login(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
-	// Находим пользователя по email
-	user, err := h.userRepo.FindByEmail(ctx, req.Email)
+	// Вызываем сервис для выполнения бизнес-логики
+	tokens, err := h.authService.Login(ctx, req.Email, req.Password)
 	if err != nil {
-		if err == storage.ErrUserNotFound {
+		if err == ErrInvalidCredentials {
 			RespondUnauthorized(c, "Неверный email или пароль")
 			return
 		}
-		h.logger.Error("ошибка поиска пользователя по email",
+		h.logger.Error("ошибка входа пользователя",
 			"request_id", h.getRequestID(c),
 			"email", req.Email,
 			"error", err,
@@ -81,30 +77,9 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	// Проверяем пароль
-	if !user.ComparePassword(req.Password) {
-		RespondUnauthorized(c, "Неверный email или пароль")
-		return
-	}
-
-	// Генерируем токены (НЕ инкрементируем token_version)
-	userIDStr := strconv.FormatInt(user.ID, 10)
-	tokens, err := h.authService.GenerateTokens(userIDStr, user.Role, user.TokenVersion)
-	if err != nil {
-		h.logger.Error("ошибка генерации токенов",
-			"request_id", h.getRequestID(c),
-			"user_id", user.ID,
-			"error", err,
-		)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
-		return
-	}
-
 	h.logger.Info("успешный вход пользователя",
 		"request_id", h.getRequestID(c),
-		"user_id", user.ID,
-		"email", user.Email,
-		"role", user.Role,
+		"email", req.Email,
 	)
 
 	c.JSON(http.StatusOK, tokens)
@@ -120,54 +95,15 @@ func (h *Handler) Refresh(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
-	// Валидируем refresh token
-	claims, err := h.authService.ValidateRefreshToken(ctx, req.RefreshToken)
+	// Вызываем сервис для выполнения бизнес-логики
+	tokens, err := h.authService.Refresh(ctx, req.RefreshToken)
 	if err != nil {
-		RespondWithError(c, http.StatusUnauthorized, ErrCodeInvalidToken, "Неверный или истекший refresh токен")
-		return
-	}
-
-	// Получаем userID из claims
-	userID, err := strconv.ParseInt(claims.UserID, 10, 64)
-	if err != nil {
-		RespondWithError(c, http.StatusUnauthorized, ErrCodeInvalidToken, "Неверный или истекший refresh токен")
-		return
-	}
-
-	// Получаем пользователя по ID для получения роли
-	user, err := h.userRepo.FindByID(ctx, userID)
-	if err != nil {
-		if err == storage.ErrUserNotFound {
+		if err == ErrInvalidToken {
 			RespondWithError(c, http.StatusUnauthorized, ErrCodeInvalidToken, "Неверный или истекший refresh токен")
 			return
 		}
-		h.logger.Error("ошибка поиска пользователя по ID",
+		h.logger.Error("ошибка обновления токенов",
 			"request_id", h.getRequestID(c),
-			"user_id", userID,
-			"error", err,
-		)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
-		return
-	}
-
-	// Старый refresh токен → в blacklist (ротация токена)
-	if err := h.authService.RevokeRefreshToken(ctx, claims); err != nil {
-		// Если Redis недоступен, логируем, но продолжаем
-		h.logger.Error("ошибка добавления refresh токена в blacklist",
-			"request_id", h.getRequestID(c),
-			"user_id", claims.UserID,
-			"jti", claims.ID,
-			"error", err,
-		)
-		// В production лучше обработать эту ошибку более явно
-	}
-
-	// Генерируем новые токены с ТОЙ ЖЕ версией (НЕ инкрементируем token_version)
-	tokens, err := h.authService.GenerateTokens(claims.UserID, user.Role, claims.Ver)
-	if err != nil {
-		h.logger.Error("ошибка генерации новых токенов при refresh",
-			"request_id", h.getRequestID(c),
-			"user_id", claims.UserID,
 			"error", err,
 		)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
@@ -176,9 +112,6 @@ func (h *Handler) Refresh(c *gin.Context) {
 
 	h.logger.Info("успешное обновление токенов",
 		"request_id", h.getRequestID(c),
-		"user_id", claims.UserID,
-		"old_jti", claims.ID,
-		"token_version", claims.Ver,
 	)
 
 	c.JSON(http.StatusOK, tokens)
@@ -186,25 +119,22 @@ func (h *Handler) Refresh(c *gin.Context) {
 
 // POST /api/v1/auth/logout
 func (h *Handler) Logout(c *gin.Context) {
-	ctx := c.Request.Context()
-
 	var req LogoutRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		RespondBadRequest(c, "refresh_token обязателен")
 		return
 	}
 
-	refreshClaims, err := h.authService.ValidateRefreshToken(ctx, req.RefreshToken)
-	if err != nil {
-		RespondWithError(c, http.StatusUnauthorized, ErrCodeInvalidToken, "Неверный или истекший refresh токен")
-		return
-	}
+	ctx := c.Request.Context()
 
-	if err := h.authService.RevokeRefreshToken(ctx, refreshClaims); err != nil {
-		h.logger.Error("ошибка отзыва refresh токена при logout",
+	// Вызываем сервис для выполнения бизнес-логики
+	if err := h.authService.Logout(ctx, req.RefreshToken); err != nil {
+		if err == ErrInvalidToken {
+			RespondWithError(c, http.StatusUnauthorized, ErrCodeInvalidToken, "Неверный или истекший refresh токен")
+			return
+		}
+		h.logger.Error("ошибка выхода пользователя",
 			"request_id", h.getRequestID(c),
-			"user_id", refreshClaims.UserID,
-			"jti", refreshClaims.ID,
 			"error", err,
 		)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
@@ -213,8 +143,6 @@ func (h *Handler) Logout(c *gin.Context) {
 
 	h.logger.Info("успешный выход пользователя",
 		"request_id", h.getRequestID(c),
-		"user_id", refreshClaims.UserID,
-		"jti", refreshClaims.ID,
 	)
 
 	c.Status(http.StatusNoContent)
@@ -238,32 +166,19 @@ func (h *Handler) Profile(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
-	// Получаем userID из claims
-	userID, err := strconv.ParseInt(accessClaims.UserID, 10, 64)
+	// Вызываем сервис для выполнения бизнес-логики
+	user, err := h.authService.GetProfile(ctx, accessClaims)
 	if err != nil {
-		RespondUnauthorized(c, "Не авторизован")
-		return
-	}
-
-	// Получаем пользователя по ID (один запрос включает token_version)
-	user, err := h.userRepo.FindByID(ctx, userID)
-	if err != nil {
-		if err == storage.ErrUserNotFound {
+		if err == ErrInvalidToken || err == ErrTokenVersionMismatch {
 			RespondUnauthorized(c, "Не авторизован")
 			return
 		}
-		h.logger.Error("ошибка поиска пользователя по ID в profile",
+		h.logger.Error("ошибка получения профиля пользователя",
 			"request_id", h.getRequestID(c),
-			"user_id", userID,
+			"user_id", accessClaims.UserID,
 			"error", err,
 		)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Внутренняя ошибка сервера"})
-		return
-	}
-
-	// Проверяем версию токена
-	if accessClaims.Ver != user.TokenVersion {
-		RespondUnauthorized(c, "Не авторизован")
 		return
 	}
 

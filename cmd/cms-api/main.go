@@ -83,27 +83,24 @@ func main() {
 	// gin.Default() включает встроенный gin.Logger(), который дублирует наш middleware.Logger
 	r := gin.New()
 	r.Use(gin.Recovery())            // Recovery middleware для обработки паник
-	r.Use(middleware.Logger(logger)) // Наш структурированный slog logger
+	r.Use(middleware.Logger(logger)) // Самописный структурированный slog logger
 
 	// Healthcheck handlers + routes (без middleware логирования для уменьшения шума)
 	healthHandler := health.NewHandler(pool, rdb, logger)
 	healthGroup := r.Group("/health")
-	{
-		healthGroup.GET("", healthHandler.Health)      // GET /health
-		healthGroup.GET("/ready", healthHandler.Ready) // GET /health/ready
-		healthGroup.GET("/live", healthHandler.Live)   // GET /health/live
-	}
+
+	healthGroup.GET("", healthHandler.Health)      // GET /health
+	healthGroup.GET("/ready", healthHandler.Ready) // GET /health/ready
+	healthGroup.GET("/live", healthHandler.Live)   // GET /health/live
 
 	// Auth handlers + routes
-	authHandler := auth.NewHandler(authService, s.User(), logger)
+	authHandler := auth.NewHandler(authService, logger)
 	authGroup := r.Group("/api/v1/auth")
-	{
-		authGroup.POST("/login", authHandler.Login)
-		authGroup.POST("/refresh", authHandler.Refresh)
 
-		authGroup.POST("/logout", authHandler.Logout)
-		authGroup.GET("/profile", auth.AuthMiddleware(authService, logger), authHandler.Profile)
-	}
+	authGroup.POST("/login", authHandler.Login)
+	authGroup.POST("/refresh", authHandler.Refresh)
+	authGroup.POST("/logout", authHandler.Logout)
+	authGroup.GET("/profile", auth.AuthMiddleware(authService, logger), authHandler.Profile)
 
 	// Определяем порт из переменной окружения (по умолчанию 8080)
 	port := os.Getenv("PORT")
